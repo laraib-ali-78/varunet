@@ -76,7 +76,8 @@ cd frontend && npm install && npm run build
 
 ## Live Deployment Links
 
-- **Frontend Portal (Vercel)**: `https://varunet.vercel.app` *(or deployed production domain)*
-- **Backend API (Railway)**: `https://varunet-production.up.railway.app`
-- **Interactive Swagger Documentation**: `https://varunet-production.up.railway.app/docs`
-- **Prometheus Metrics**: `https://varunet-production.up.railway.app/metrics`
+- **Live Frontend Portal (Vercel)**: [https://frontend-two-tan-24.vercel.app](https://frontend-two-tan-24.vercel.app)
+- **Live Backend API (Railway)**: [https://backend-production-538ef.up.railway.app](https://backend-production-538ef.up.railway.app)
+- **Interactive OpenAPI / Swagger Documentation**: [https://backend-production-538ef.up.railway.app/docs](https://backend-production-538ef.up.railway.app/docs)
+- **Prometheus Telemetry Scraper**: [https://prometheus-production-3385.up.railway.app](https://prometheus-production-3385.up.railway.app)
+- **Grafana Live Latency Dashboard**: [https://grafana-production-67a9.up.railway.app/d/varunet-api-latency](https://grafana-production-67a9.up.railway.app/d/varunet-api-latency) (Login: `admin` / `admin`)
