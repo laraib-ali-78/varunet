@@ -1,0 +1,60 @@
+services:
+  # ==============================================================================
+  # 1. VaruNet Backend API (FastAPI + XGBoost + TreeSHAP + RBAC + Prometheus)
+  # ==============================================================================
+  - type: web
+    name: varunet-backend
+    env: docker
+    dockerfilePath: backend/Dockerfile
+    dockerContext: .
+    plan: free
+    region: oregon
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: PORT
+        value: 8000
+      - key: DATABASE_URL
+        fromDatabase:
+          name: varunet-db
+          property: connectionString
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: ACCESS_TOKEN_EXPIRE_HOURS
+        value: 24
+      - key: CORS_ORIGINS
+        value: "https://varunet-frontend.onrender.com,http://localhost:3000"
+
+  # ==============================================================================
+  # 2. VaruNet Frontend Portal (React 18 + TypeScript + Vite + Recharts + Leaflet)
+  # ==============================================================================
+  - type: web
+    name: varunet-frontend
+    env: static
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    plan: free
+    region: oregon
+    autoDeploy: true
+    envVars:
+      - key: VITE_API_URL
+        value: https://varunet-backend.onrender.com/api
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+# ==============================================================================
+# 3. PostgreSQL Database with PostGIS Extension Support
+# ==============================================================================
+databases:
+  - name: varunet-db
+    databaseName: varunet
+    user: postgres
+    plan: free
+    region: oregon
+    postgresMajorVersion: 15
+    ipAllowList: []

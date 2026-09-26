@@ -1,0 +1,77 @@
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.cert
+*.crt
+id_rsa*
+secrets/
+
+# Dependencies
+node_modules/
+vendor/
+
+# Python caches and bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Logs and databases
+*.log
+*.sqlite
+*.sqlite3
+pgdata/
+prometheus_data/
+grafana_data/
+
+# OS and Editor artifacts
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Large ML binary models (exclude deep weights/checkpoints, keep core 627KB joblib)
+*.bin
+*.pt
+*.pth
+*.onnx
+*.safetensors
+*.h5
+*.ckpt
+ml/models/*.bin
+ml/models/*.pt
+ml/models/*.onnx
+
+# Frontend build output (Vercel builds dist on deployment)
+frontend/dist/
+frontend/dist-ssr/
+frontend/.cache/
+frontend/coverage/

@@ -1,0 +1,110 @@
+version: '3.8'
+
+networks:
+  varunet-net:
+    driver: bridge
+
+volumes:
+  pgdata:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+services:
+  # 1. Database: PostgreSQL 15 with PostGIS Extension
+  db:
+    image: postgis/postgis:15-3.3
+    container_name: varunet-db
+    restart: unless-stopped
+    networks:
+      - varunet-net
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-varunet}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgrespassword}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-varunet}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 2. Backend: FastAPI Service (Ingestion, Blending, SHAP Explainability, Alerting, RBAC)
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: varunet-backend
+    restart: unless-stopped
+    networks:
+      - varunet-net
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgrespassword@db:5432/varunet}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-varunet_production_sih26081_super_secret_jwt_key_2026}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+    ports:
+      - "${PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # 3. Frontend: React + TypeScript Operator Dashboard and Citizen Portal
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: varunet-frontend
+    restart: unless-stopped
+    networks:
+      - varunet-net
+    environment:
+      - VITE_API_URL=${VITE_API_URL:-http://localhost:8000/api}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+  # 4. Monitoring: Prometheus Metrics Scraper
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: varunet-prometheus
+    restart: unless-stopped
+    networks:
+      - varunet-net
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./docs/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    depends_on:
+      - backend
+
+  # 5. Monitoring: Grafana Visualization Dashboard
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: varunet-grafana
+    restart: unless-stopped
+    networks:
+      - varunet-net
+    ports:
+      - "${GRAFANA_PORT:-3001}:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./docs/grafana_dashboard.json:/etc/grafana/provisioning/dashboards/varunet_dashboard.json:ro
+    depends_on:
+      - prometheus
