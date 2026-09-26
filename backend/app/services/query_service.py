@@ -226,13 +226,49 @@ def fetch_or_compute_blend(
     from backend.app.services.blending_engine import blend_and_store, predict_weights
     from ml.explainability.shap_explainer import explain_and_store
 
-    if not source_forecasts:
-        # Default representative multi-model inputs if raw inputs are not supplied
-        source_forecasts = {
-            "fcst_nwp": 24.5,
-            "fcst_aiml": 26.0,
-            "fcst_ensemble": 25.2,
+    if not source_forecasts and db_session is not None:
+        source_forecasts = {}
+        sql_fcsts = """
+        SELECT source_id, value 
+        FROM forecasts 
+        WHERE region_id = :region_id 
+          AND valid_time = :valid_time 
+          AND lead_time_hrs = :lead_time_hrs 
+          AND variable = :variable;
+        """
+        source_map = {1: "fcst_nwp", 2: "fcst_aiml", 3: "fcst_ensemble"}
+        params = {
+            "region_id": region_id,
+            "valid_time": valid_time,
+            "lead_time_hrs": lead_time_hrs,
+            "variable": variable,
         }
+        try:
+            if hasattr(db_session, "execute") and hasattr(db_session, "commit"):
+                from sqlalchemy import text
+                f_rows = db_session.execute(text(sql_fcsts), params).fetchall()
+            elif hasattr(db_session, "cursor"):
+                import re
+                cursor = db_session.cursor()
+                p_sql = re.sub(r':([a-zA-Z0-9_]+)', r'%(\1)s', sql_fcsts)
+                cursor.execute(p_sql, params)
+                f_rows = cursor.fetchall()
+            else:
+                f_rows = []
+
+            for r in f_rows:
+                s_name = source_map.get(r[0])
+                if s_name:
+                    source_forecasts[s_name] = float(r[1])
+        except Exception as e:
+            logger.warning("Error querying forecasts for blend: %s", str(e))
+
+    if not source_forecasts or len(source_forecasts) == 0:
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=404,
+            detail=f"No forecast data available for region {region_id}, lead_time {lead_time_hrs}h, variable '{variable}' at valid_time {valid_time}."
+        )
 
     blend_result = blend_and_store(
         db_session=db_session,

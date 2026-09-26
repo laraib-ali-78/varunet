@@ -65,14 +65,25 @@ app.include_router(alerts_router)
 async def scheduled_ingestion_worker():
     """
     Ingestion scheduling worker running inside the backend container.
-    Periodically checks and ingests multi-model NWP and AI forecasts.
+    Periodically ingests forecast frames using calibrated proxy feeds.
     """
     logger.info("VaruNet Ingestion Scheduler started inside backend container.")
-    await asyncio.sleep(3)
-    logger.info("Scheduled ingestion run completed: Ingested latest NWP/AI forecast frames (IMD GFS, NCUM, ECMWF, GraphCast) successfully.")
+    await asyncio.sleep(2)
+    try:
+        from backend.app.services.ingestion_service import ingest_forecast_cycle
+        count = ingest_forecast_cycle()
+        logger.info("Initial ingestion cycle completed: Ingested %d forecast rows into database.", count)
+    except Exception as e:
+        logger.error("Initial ingestion cycle failed: %s", str(e))
+
     while True:
         await asyncio.sleep(3600)  # Next scheduled run
-        logger.info("Scheduled ingestion run completed: Ingestion cycle executed successfully.")
+        try:
+            from backend.app.services.ingestion_service import ingest_forecast_cycle
+            count = ingest_forecast_cycle()
+            logger.info("Scheduled ingestion run completed: Ingested %d forecast rows into database.", count)
+        except Exception as e:
+            logger.error("Scheduled ingestion cycle failed: %s", str(e))
 
 
 @app.on_event("startup")

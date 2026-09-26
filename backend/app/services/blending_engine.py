@@ -277,8 +277,9 @@ def write_blended_forecast(
         if hasattr(db_session, "commit"):
             db_session.commit()
     else:
+        import re
         cursor = db_session.cursor()
-        psycopg2_sql = insert_sql.replace(":", "%(") + ")"
+        psycopg2_sql = re.sub(r':([a-zA-Z0-9_]+)', r'%(\1)s', insert_sql)
         cursor.execute(psycopg2_sql, params)
         row = cursor.fetchone()
         if row:

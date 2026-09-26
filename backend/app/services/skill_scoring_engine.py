@@ -305,8 +305,9 @@ def upsert_skill_scores(db_connection_or_session, scores_df: pd.DataFrame) -> in
             db_connection_or_session.execute(text(upsert_sql), params)
         else:
             # psycopg2 style parameter mapping
+            import re
             cursor = db_connection_or_session.cursor()
-            psycopg2_sql = upsert_sql.replace(":", "%(") + ")"
+            psycopg2_sql = re.sub(r':([a-zA-Z0-9_]+)', r'%(\1)s', upsert_sql)
             cursor.execute(psycopg2_sql, params)
         count += 1
 

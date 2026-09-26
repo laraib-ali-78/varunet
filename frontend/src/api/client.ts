@@ -1,9 +1,85 @@
 /**
  * VaruNet Frontend API Client
- * Connects directly to FastAPI backend endpoints.
+ * Connects directly to FastAPI backend endpoints with JWT authentication support.
  */
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+
+// Token Management
+export const AUTH_TOKEN_KEY = 'varunet_auth_token';
+export const AUTH_USER_KEY = 'varunet_auth_user';
+
+export function getAuthToken(): string | null {
+  try {
+    return localStorage.getItem(AUTH_TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setAuthToken(token: string | null): void {
+  try {
+    if (token) {
+      localStorage.setItem(AUTH_TOKEN_KEY, token);
+    } else {
+      localStorage.removeItem(AUTH_TOKEN_KEY);
+      localStorage.removeItem(AUTH_USER_KEY);
+    }
+  } catch {
+    // Ignore storage errors in restricted contexts
+  }
+}
+
+export function getStoredUser(): { email: string; role: string } | null {
+  try {
+    const raw = localStorage.getItem(AUTH_USER_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function getAuthHeaders(): HeadersInit {
+  const token = getAuthToken();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
+}
+
+export interface LoginResponse {
+  access_token: string;
+  token_type: string;
+  role: string;
+  email: string;
+}
+
+export async function loginUser(email: string, password: string): Promise<LoginResponse> {
+  const res = await fetch(`${API_BASE_URL}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.detail || `Authentication failed: ${res.statusText}`);
+  }
+  const data: LoginResponse = await res.json();
+  setAuthToken(data.access_token);
+  try {
+    localStorage.setItem(AUTH_USER_KEY, JSON.stringify({ email: data.email, role: data.role }));
+  } catch {
+    // ignore
+  }
+  return data;
+}
+
+export function logoutUser(): void {
+  setAuthToken(null);
+}
 
 export interface ForecastRecord {
   forecast_id: number;
@@ -72,7 +148,9 @@ export async function fetchRawForecasts(params: {
   if (params.lead_time_hrs !== undefined) query.append('lead_time_hrs', params.lead_time_hrs.toString());
   if (params.variable) query.append('variable', params.variable);
 
-  const res = await fetch(`${API_BASE_URL}/forecasts?${query.toString()}`);
+  const res = await fetch(`${API_BASE_URL}/forecasts?${query.toString()}`, {
+    headers: getAuthHeaders(),
+  });
   if (!res.ok) throw new Error(`Failed to fetch forecasts: ${res.statusText}`);
   return res.json();
 }
@@ -128,7 +206,9 @@ export async function fetchSkillScores(params: {
   if (params.lead_time_bucket) query.append('lead_time_bucket', params.lead_time_bucket);
   if (params.variable) query.append('variable', params.variable);
 
-  const res = await fetch(`${API_BASE_URL}/skill-scores?${query.toString()}`);
+  const res = await fetch(`${API_BASE_URL}/skill-scores?${query.toString()}`, {
+    headers: getAuthHeaders(),
+  });
   if (!res.ok) throw new Error(`Failed to fetch skill scores: ${res.statusText}`);
   return res.json();
 }
@@ -141,8 +221,21 @@ export async function fetchAlerts(params: {
   if (params.region_id !== undefined) query.append('region_id', params.region_id.toString());
   if (params.severity) query.append('severity', params.severity);
 
-  const res = await fetch(`${API_BASE_URL}/alerts?${query.toString()}`);
+  const res = await fetch(`${API_BASE_URL}/alerts?${query.toString()}`, {
+    headers: getAuthHeaders(),
+  });
   if (!res.ok) throw new Error(`Failed to fetch alerts: ${res.statusText}`);
+  return res.json();
+}
+
+export async function fetchCitizenAlerts(params: {
+  region_id?: number;
+}): Promise<AlertRecord[]> {
+  const query = new URLSearchParams();
+  if (params.region_id !== undefined) query.append('region_id', params.region_id.toString());
+
+  const res = await fetch(`${API_BASE_URL}/alerts/citizen?${query.toString()}`);
+  if (!res.ok) throw new Error(`Failed to fetch citizen alerts: ${res.statusText}`);
   return res.json();
 }
 

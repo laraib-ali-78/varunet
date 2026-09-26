@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { fetchBlendedForecast, fetchAlerts, BlendedForecastRecord, AlertRecord } from '../../api/client';
+import { fetchBlendedForecast, fetchCitizenAlerts, BlendedForecastRecord, AlertRecord } from '../../api/client';
 
 export interface CityOption {
   name: string;
@@ -38,8 +38,8 @@ export const CitizenPortal: React.FC = () => {
         lead_time_hrs: 24,
         variable: 'rainfall',
       }),
-      // 3. Active public-safety advisory from /alerts endpoint
-      fetchAlerts({
+      // 3. Active public-safety advisory from /alerts/citizen endpoint (public)
+      fetchCitizenAlerts({
         region_id: selectedCity.regionId,
       }).catch(() => []),
     ])
