@@ -1,10 +1,36 @@
-"""
-Query Service for VaruNet
-Executes raw SQL queries against PostgreSQL tables for the thin router endpoints.
-"""
-
+import re
+import logging
 from typing import List, Dict, Optional, Any
 from datetime import datetime
+
+logger = logging.getLogger("varunet.query")
+
+
+def execute_query(db_session, sql: str, params: Optional[Dict[str, Any]] = None):
+    if db_session is None:
+        return []
+    if params is None:
+        params = {}
+    try:
+        if hasattr(db_session, "execute") and hasattr(db_session, "commit"):
+            from sqlalchemy import text
+            res = db_session.execute(text(sql), params)
+            if hasattr(res, "fetchall"):
+                return res.fetchall()
+            return []
+        elif hasattr(db_session, "cursor"):
+            cursor = db_session.cursor()
+            p_sql = re.sub(r':([a-zA-Z0-9_]+)', r'%(\1)s', sql)
+            cursor.execute(p_sql, params)
+            if hasattr(cursor, "fetchall"):
+                return cursor.fetchall()
+            return []
+        elif hasattr(db_session, "fetchall"):
+            return db_session.fetchall()
+        return []
+    except Exception as e:
+        logger.error("Query execution error on SQL '%s': %s", sql[:60], str(e))
+        return []
 
 
 def fetch_forecasts(
@@ -38,23 +64,19 @@ def fetch_forecasts(
     sql += " ORDER BY valid_time DESC LIMIT :limit;"
     params["limit"] = limit
 
-    results = []
-    try:
-        from sqlalchemy import text
-        res = db_session.execute(text(sql), params)
-        for r in res.fetchall():
-            results.append({
-                "forecast_id": r[0],
-                "source_id": r[1],
-                "region_id": r[2],
-                "valid_time": r[3],
-                "lead_time_hrs": r[4],
-                "variable": r[5],
-                "value": r[6],
-            })
-    except Exception:
-        pass
-    return results
+    rows = execute_query(db_session, sql, params)
+    return [
+        {
+            "forecast_id": r[0],
+            "source_id": r[1],
+            "region_id": r[2],
+            "valid_time": r[3],
+            "lead_time_hrs": r[4],
+            "variable": r[5],
+            "value": r[6],
+        }
+        for r in rows
+    ]
 
 
 def fetch_observations(
@@ -84,20 +106,16 @@ def fetch_observations(
     sql += " ORDER BY valid_time DESC LIMIT :limit;"
     params["limit"] = limit
 
-    results = []
-    try:
-        from sqlalchemy import text
-        res = db_session.execute(text(sql), params)
-        for r in res.fetchall():
-            results.append({
-                "region_id": r[0],
-                "valid_time": r[1],
-                "variable": r[2],
-                "value": r[3],
-            })
-    except Exception:
-        pass
-    return results
+    rows = execute_query(db_session, sql, params)
+    return [
+        {
+            "region_id": r[0],
+            "valid_time": r[1],
+            "variable": r[2],
+            "value": r[3],
+        }
+        for r in rows
+    ]
 
 
 def fetch_skill_scores(
@@ -143,28 +161,24 @@ def fetch_skill_scores(
     sql += " ORDER BY last_updated DESC LIMIT :limit;"
     params["limit"] = limit
 
-    results = []
-    try:
-        from sqlalchemy import text
-        res = db_session.execute(text(sql), params)
-        for r in res.fetchall():
-            results.append({
-                "score_id": r[0],
-                "source_id": r[1],
-                "region_id": r[2],
-                "regime_id": r[3],
-                "season": r[4],
-                "lead_time_bucket": r[5],
-                "variable": r[6],
-                "rmse": r[7],
-                "mae": r[8],
-                "bias": r[9],
-                "sample_size": r[10],
-                "last_updated": r[11],
-            })
-    except Exception:
-        pass
-    return results
+    rows = execute_query(db_session, sql, params)
+    return [
+        {
+            "score_id": r[0],
+            "source_id": r[1],
+            "region_id": r[2],
+            "regime_id": r[3],
+            "season": r[4],
+            "lead_time_bucket": r[5],
+            "variable": r[6],
+            "rmse": r[7],
+            "mae": r[8],
+            "bias": r[9],
+            "sample_size": r[10],
+            "last_updated": r[11],
+        }
+        for r in rows
+    ]
 
 
 def fetch_or_compute_blend(
