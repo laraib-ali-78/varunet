@@ -37,26 +37,23 @@ def get_db() -> Generator[Optional[Any], None, None]:
     FastAPI dependency yielding database session/connection.
     """
     session = None
-    try:
-        if SessionLocal is not None:
+    if SessionLocal is not None:
+        try:
             session = SessionLocal()
-            yield session
-        else:
-            import psycopg2
-            conn = psycopg2.connect(DATABASE_URL)
-            session = conn
-            yield conn
-    except Exception as e:
-        logger.error("Database connection error in get_db: %s", str(e))
-        # Final attempt: direct psycopg2 connection
+        except Exception as e:
+            logger.error("Could not create SQLAlchemy session: %s", str(e))
+            session = None
+    if session is None:
         try:
             import psycopg2
-            conn = psycopg2.connect(DATABASE_URL)
-            session = conn
-            yield conn
-        except Exception as e2:
-            logger.error("Final direct psycopg2 fallback failed: %s", str(e2))
-            yield None
+            session = psycopg2.connect(DATABASE_URL)
+        except Exception as e:
+            logger.error("Database connection error in get_db: %s", str(e))
+            session = None
+
+    try:
+        yield session
     finally:
         if session is not None and hasattr(session, "close"):
             session.close()
+
