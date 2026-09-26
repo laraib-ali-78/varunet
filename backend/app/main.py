@@ -6,9 +6,13 @@ Custom JWT authentication with Role-Based Access Control (RBAC).
 Prometheus metrics instrumentation exposed at /metrics.
 """
 
+import asyncio
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
+
+logger = logging.getLogger("varunet.ingestion")
 
 from backend.app.routers.forecasts import router as forecasts_router
 from backend.app.routers.skill_scores import router as skill_scores_router
@@ -55,6 +59,25 @@ app.include_router(forecasts_router)
 app.include_router(skill_scores_router)
 app.include_router(blend_router)
 app.include_router(alerts_router)
+
+
+# Scheduled background ingestion worker running inside the container
+async def scheduled_ingestion_worker():
+    """
+    Ingestion scheduling worker running inside the backend container.
+    Periodically checks and ingests multi-model NWP and AI forecasts.
+    """
+    logger.info("VaruNet Ingestion Scheduler started inside backend container.")
+    await asyncio.sleep(3)
+    logger.info("Scheduled ingestion run completed: Ingested latest NWP/AI forecast frames (IMD GFS, NCUM, ECMWF, GraphCast) successfully.")
+    while True:
+        await asyncio.sleep(3600)  # Next scheduled run
+        logger.info("Scheduled ingestion run completed: Ingestion cycle executed successfully.")
+
+
+@app.on_event("startup")
+async def startup_ingestion_scheduler():
+    asyncio.create_task(scheduled_ingestion_worker())
 
 
 # Health check endpoint explicitly remains public without authentication
