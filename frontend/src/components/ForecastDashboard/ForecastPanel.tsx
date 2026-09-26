@@ -104,19 +104,23 @@ export const ForecastPanel: React.FC<ForecastPanelProps> = ({ selectors }) => {
     return (
       <div style={{
         padding: '24px',
-        background: '#450a0a',
-        border: '1px solid #b91c1c',
+        background: '#1e1b4b',
+        border: '1px solid #6366f1',
         borderRadius: '12px',
-        color: '#fecaca',
+        color: '#e0e7ff',
         marginBottom: '20px'
       }}>
-        <strong>Backend Communication Notice:</strong> {error}
-        <div style={{ fontSize: '13px', marginTop: '6px', color: '#fca5a5' }}>
-          Ensure FastAPI backend is running on http://localhost:8000.
+        <div style={{ fontSize: '16px', fontWeight: 700, color: '#a5b4fc', marginBottom: '8px' }}>
+          VaruNet Query Advisory
+        </div>
+        <div style={{ fontSize: '14px', lineHeight: '1.5' }}>{error}</div>
+        <div style={{ fontSize: '13px', marginTop: '10px', color: '#cbd5e1' }}>
+          Tip: Select the verified active monsoon cycle (e.g. 2024-06-15) or realtime cycle (2026-09-27) in the selector bar above to inspect live multi-model blends.
         </div>
       </div>
     );
   }
+
 
   const weights = blend?.weights_json || {};
   const confidencePercent = Math.round((blend?.confidence_score || 0) * 100);

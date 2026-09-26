@@ -10,11 +10,12 @@ import { getStoredUser, loginUser, logoutUser } from '../api/client';
 export const DashboardPage: React.FC = () => {
   const [selectors, setSelectors] = useState<SelectorState>({
     regionId: 1,
-    validTime: new Date().toISOString(),
+    validTime: '2024-06-15T00:00:00Z',
     leadTimeHrs: 24,
     variable: 'rainfall',
     regimeId: 1,
   });
+
 
   const [activeSection, setActiveSection] = useState<'forecast' | 'alerts' | 'analytics'>('forecast');
   

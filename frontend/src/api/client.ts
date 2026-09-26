@@ -3,7 +3,18 @@
  * Connects directly to FastAPI backend endpoints with JWT authentication support.
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+const getApiBaseUrl = (): string => {
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    return 'https://backend-production-538ef.up.railway.app/api';
+  }
+  return 'http://localhost:8000/api';
+};
+
+const API_BASE_URL = getApiBaseUrl();
+
 
 // Token Management
 export const AUTH_TOKEN_KEY = 'varunet_auth_token';

@@ -20,14 +20,20 @@ query GetLatestDepl($serviceId: String!, $envId: String!) {
 }
 """
 
-for i in range(12):
+for i in range(25):
     res = requests.post(
         "https://backboard.railway.app/graphql/v2",
         headers=headers,
         json={"query": q, "variables": {"serviceId": BACKEND_SERVICE_ID, "envId": ENV_ID}}
     ).json()
     node = res["data"]["deployments"]["edges"][0]["node"]
-    print(f"[{i+1}/12] Deployment {node['id']} status: {node['status']}")
+    print(f"[{i+1}/25] Deployment {node['id']} - status: {node['status']}")
     if node["status"] == "SUCCESS":
+        print("Latest deployment is LIVE!")
+        break
+    if node["status"] in ["FAILED", "CRASHED"]:
+        print(f"Deployment {node['status']}!")
         break
     time.sleep(10)
+
+
