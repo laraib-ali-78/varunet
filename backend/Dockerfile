@@ -25,7 +25,9 @@ RUN pip install --no-cache-dir \
     bcrypt \
     pyjwt \
     prometheus-fastapi-instrumentator \
-    httpx
+    httpx \
+    psycopg2-binary \
+    sqlalchemy
 
 # Copy application source
 COPY . /app
