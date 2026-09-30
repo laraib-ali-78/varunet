@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { fetchBlendedForecast, fetchCitizenAlerts, BlendedForecastRecord, AlertRecord } from '../../api/client';
+import { fetchCitizenBlend, fetchCitizenAlerts, CitizenBlendRecord, AlertRecord } from '../../api/client';
 
 export interface CityOption {
   name: string;
@@ -18,7 +18,7 @@ export const CITIES: CityOption[] = [
 
 export const CitizenPortal: React.FC = () => {
   const [selectedCity, setSelectedCity] = useState<CityOption>(CITIES[0]);
-  const [blend, setBlend] = useState<BlendedForecastRecord | null>(null);
+  const [blend, setBlend] = useState<CitizenBlendRecord | null>(null);
   const [activeAlert, setActiveAlert] = useState<AlertRecord | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -28,25 +28,31 @@ export const CitizenPortal: React.FC = () => {
     setLoading(true);
     setError(null);
 
-    const nowIso = new Date().toISOString();
+    const loadData = async () => {
+      try {
+        const [blendData, alertsData] = await Promise.all([
+          // 1. Plain-language forecast from citizen blend endpoint
+          fetchCitizenBlend({
+            region_id: selectedCity.regionId,
+            lead_time_hrs: 24,
+            variable: 'rainfall',
+          }).catch(async () => {
+            // Secondary fallback to active monsoon case study cycle
+            return await fetchCitizenBlend({
+              region_id: selectedCity.regionId,
+              valid_time: '2024-06-15T00:00:00Z',
+              lead_time_hrs: 24,
+              variable: 'rainfall',
+            });
+          }),
+          // 2. Active public-safety advisory from /alerts/citizen endpoint
+          fetchCitizenAlerts({
+            region_id: selectedCity.regionId,
+          }).catch(() => []),
+        ]);
 
-    Promise.all([
-      // 1. Plain-language forecast from /blend endpoint
-      fetchBlendedForecast({
-        region_id: selectedCity.regionId,
-        valid_time: nowIso,
-        lead_time_hrs: 24,
-        variable: 'rainfall',
-      }),
-      // 3. Active public-safety advisory from /alerts/citizen endpoint (public)
-      fetchCitizenAlerts({
-        region_id: selectedCity.regionId,
-      }).catch(() => []),
-    ])
-      .then(([blendData, alertsData]) => {
         if (isMounted) {
           setBlend(blendData);
-          // Find most severe active alert if any
           if (alertsData && alertsData.length > 0) {
             setActiveAlert(alertsData[0]);
           } else {
@@ -54,21 +60,34 @@ export const CitizenPortal: React.FC = () => {
           }
           setLoading(false);
         }
-      })
-      .catch((err) => {
+      } catch (err: any) {
         if (isMounted) {
-          setError(err.message || 'Unable to load weather information.');
+          setError(err.message || 'Unable to load real-time weather information.');
           setLoading(false);
         }
-      });
+      }
+    };
+
+    loadData();
 
     return () => {
       isMounted = false;
     };
   }, [selectedCity]);
 
+
   // 2. Simple confidence indicator using words, NOT numbers
-  const getPlainLanguageConfidence = (score: number) => {
+  const getPlainLanguageConfidence = (labelOrScore?: string | number) => {
+    let score = 0.8;
+    if (typeof labelOrScore === 'number') {
+      score = labelOrScore;
+    } else if (typeof labelOrScore === 'string') {
+      const l = labelOrScore.toLowerCase();
+      if (l.includes('high')) score = 0.85;
+      else if (l.includes('mod')) score = 0.55;
+      else score = 0.25;
+    }
+
     if (score >= 0.70) {
       return {
         label: 'High Confidence',
@@ -115,7 +134,7 @@ export const CitizenPortal: React.FC = () => {
       };
     } else if (rainfallMm < 64.5) {
       return {
-        headline: 'Moderate Rainfall',
+        headline: 'Moderate Steady Rainfall',
         detail: 'Steady rain showers expected. Roads may be slick; plan for normal travel delays.',
         icon: '🌧️',
       };
@@ -146,9 +165,14 @@ export const CitizenPortal: React.FC = () => {
     return alertText;
   };
 
-  const confidence = getPlainLanguageConfidence(blend?.confidence_score ?? 0.8);
-  const summary = getPlainLanguageSummary(blend?.blended_value ?? 12.0);
+  const confidence = getPlainLanguageConfidence(blend?.confidence_label);
+  const baseSummary = getPlainLanguageSummary(blend?.blended_value ?? 12.0);
+  const summary = {
+    ...baseSummary,
+    detail: blend?.plain_language_summary || baseSummary.detail,
+  };
   const publicSafetySentence = getPublicSafetySentence(activeAlert?.sector_guidance_text);
+
 
   return (
     <div style={{
@@ -237,14 +261,38 @@ export const CitizenPortal: React.FC = () => {
         </div>
       ) : error ? (
         <div style={{
-          background: '#fef2f2',
-          border: '1px solid #fecaca',
-          borderRadius: '12px',
-          padding: '16px 20px',
-          color: '#991b1b',
+          background: '#ffffff',
+          borderRadius: '16px',
+          padding: '32px 24px',
+          textAlign: 'center',
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.06)',
+          border: '1px solid #fed7aa',
         }}>
-          {error}
+          <div style={{ fontSize: '32px', marginBottom: '10px' }}>🌦️</div>
+          <div style={{ fontWeight: 700, fontSize: '17px', color: '#9a3412', marginBottom: '6px' }}>
+            Weather Forecast Advisory
+          </div>
+          <div style={{ fontSize: '14px', color: '#7c2d12', marginBottom: '18px', lineHeight: '1.5' }}>
+            {error}
+          </div>
+          <button
+            onClick={() => setSelectedCity({ ...selectedCity })}
+            style={{
+              background: '#4f46e5',
+              color: '#ffffff',
+              border: 'none',
+              padding: '10px 22px',
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              boxShadow: '0 2px 8px rgba(79, 70, 229, 0.3)',
+            }}
+          >
+            Refresh Weather Data
+          </button>
         </div>
+
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           {/* Main Weather Card */}

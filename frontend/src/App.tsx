@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { DashboardPage } from './pages/DashboardPage';
 import { CitizenPortal } from './components/CitizenPortal/CitizenPortal';
+import { VoiceAssistant } from './components/VoiceAssistant/VoiceAssistant';
 
 export const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<'operator' | 'citizen'>('operator');
@@ -65,8 +66,15 @@ export const App: React.FC = () => {
           <CitizenPortal />
         </div>
       )}
+
+      {/* Global AI Weather Voice Assistant (VaruBot) */}
+      <VoiceAssistant
+        currentView={currentView}
+        onNavigateView={(v) => setCurrentView(v)}
+      />
     </div>
   );
 };
 
 export default App;
+

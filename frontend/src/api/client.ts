@@ -239,6 +239,35 @@ export async function fetchAlerts(params: {
   return res.json();
 }
 
+export interface CitizenBlendRecord {
+  region_id: number;
+  valid_time: string;
+  variable: string;
+  blended_value: number;
+  confidence_label: string;
+  plain_language_summary: string;
+}
+
+export async function fetchCitizenBlend(params: {
+  region_id: number;
+  valid_time?: string;
+  lead_time_hrs?: number;
+  variable?: string;
+}): Promise<CitizenBlendRecord> {
+  const query = new URLSearchParams();
+  query.append('region_id', params.region_id.toString());
+  if (params.valid_time) query.append('valid_time', params.valid_time);
+  if (params.lead_time_hrs !== undefined) query.append('lead_time_hrs', params.lead_time_hrs.toString());
+  if (params.variable) query.append('variable', params.variable);
+
+  const res = await fetch(`${API_BASE_URL}/blend/citizen?${query.toString()}`);
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.detail || `Failed to fetch citizen blend: ${res.statusText || res.status}`);
+  }
+  return res.json();
+}
+
 export async function fetchCitizenAlerts(params: {
   region_id?: number;
 }): Promise<AlertRecord[]> {
@@ -246,9 +275,10 @@ export async function fetchCitizenAlerts(params: {
   if (params.region_id !== undefined) query.append('region_id', params.region_id.toString());
 
   const res = await fetch(`${API_BASE_URL}/alerts/citizen?${query.toString()}`);
-  if (!res.ok) throw new Error(`Failed to fetch citizen alerts: ${res.statusText}`);
+  if (!res.ok) throw new Error(`Failed to fetch citizen alerts: ${res.statusText || res.status}`);
   return res.json();
 }
+
 
 export interface ModelComparisonRecord {
   strategy: string;

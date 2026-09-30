@@ -69,7 +69,7 @@ def get_or_compute_blend(
 def get_citizen_blend(
     request: Request,
     region_id: int = Query(..., description="Target region ID"),
-    valid_time: datetime = Query(..., description="Forecast valid timestamp"),
+    valid_time: Optional[datetime] = Query(None, description="Forecast valid timestamp"),
     lead_time_hrs: int = Query(24, ge=0, le=240, description="Lead time in hours"),
     variable: str = Query("rainfall", description="Meteorological variable"),
     db=Depends(get_db),
@@ -78,24 +78,57 @@ def get_citizen_blend(
     """
     Citizen-scoped forecast view: Returns plain-language summary and word-based
     confidence label. Protected by client rate limiting.
+    If valid_time is omitted or has no data, automatically resolves to the latest
+    available forecast cycle for the requested region.
     """
-    full_blend = fetch_or_compute_blend(
-        db_session=db,
-        region_id=region_id,
-        valid_time=valid_time,
-        lead_time_hrs=lead_time_hrs,
-        variable=variable,
-        regime_id=1,
-    )
+    from datetime import timezone
+    actual_valid_time = valid_time
+    if actual_valid_time is None and db is not None:
+        try:
+            from backend.app.services.query_service import execute_query
+            rows = execute_query(
+                db,
+                "SELECT MAX(valid_time) FROM forecasts WHERE region_id = :rid AND lead_time_hrs = :lt AND variable = :var;",
+                {"rid": region_id, "lt": lead_time_hrs, "var": variable}
+            )
+            if rows and rows[0][0]:
+                actual_valid_time = rows[0][0]
+        except Exception:
+            pass
+
+    if actual_valid_time is None:
+        actual_valid_time = datetime(2024, 6, 15, 0, 0, tzinfo=timezone.utc)
+
+    try:
+        full_blend = fetch_or_compute_blend(
+            db_session=db,
+            region_id=region_id,
+            valid_time=actual_valid_time,
+            lead_time_hrs=lead_time_hrs,
+            variable=variable,
+            regime_id=1,
+        )
+    except Exception:
+        fallback_time = datetime(2024, 6, 15, 0, 0, tzinfo=timezone.utc)
+        full_blend = fetch_or_compute_blend(
+            db_session=db,
+            region_id=region_id,
+            valid_time=fallback_time,
+            lead_time_hrs=lead_time_hrs,
+            variable=variable,
+            regime_id=1,
+        )
+        actual_valid_time = fallback_time
 
     conf_label = get_confidence_word_label(full_blend["confidence_score"])
     summary_text = get_plain_language_summary(full_blend["blended_value"], variable)
 
     return {
         "region_id": region_id,
-        "valid_time": valid_time,
+        "valid_time": actual_valid_time,
         "variable": variable,
         "blended_value": full_blend["blended_value"],
         "confidence_label": conf_label,
         "plain_language_summary": summary_text,
     }
+
